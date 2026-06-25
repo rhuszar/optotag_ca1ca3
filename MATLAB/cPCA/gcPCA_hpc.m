@@ -2,7 +2,6 @@ function gcPCA_hpc( index )
 %{
 
 - bin into ripples, then CA1 PBEs, then CA3 PBE...
-
 - run_gcpca - ensures that variance explained is balanced across conditions  
 
 %}
@@ -31,7 +30,7 @@ params.min_n_spk = min_n_spk;
 params.filter_low_fr = filter_low_fr;
 
 % path to sessions folder on the HPC
-datpath = '/gpfs/scratch/rh2618/rh_data';
+datpath = '...';
 
 index = str2double(index);
 % load the session paths
@@ -69,8 +68,7 @@ outfile_err = fullfile( outpath, [ basename '_ERROR.mat'] );
 
 e = [];
 details = struct();
-details.description = [ 'bin data into high-synchrony events in rest periods; run contrastive PCA; '...
-           'then project components onto each behavior subsession to track expression' ];
+details.description = [ 'bin data into high-synchrony events in rest periods; run contrastive PCA' ];
 details.err_msg = cell(1,4);
 contr_assemblies = struct();
 try
@@ -99,9 +97,9 @@ try
     pyrid = find( pyrid );
     
     % behavior intervals
-    contr_assemblies.pre_ints = [ tracking.events.onMaze_startTime{1} tracking.events.openBox_ints{1}(:,2) ];
+    contr_assemblies.probe1_ints = [ tracking.events.onMaze_startTime{1} tracking.events.openBox_ints{1}(:,2) ];
     contr_assemblies.learn_trial_ints = [ tracking.events.onMaze_startTime{2} cellfun( @(x) x(end), tracking.events.rewardTime ) ];
-    contr_assemblies.post_ints = [ tracking.events.onMaze_startTime{3} tracking.events.openBox_ints{3}(:,2) ];
+    contr_assemblies.probe2_ints = [ tracking.events.onMaze_startTime{3} tracking.events.openBox_ints{3}(:,2) ];
     
     % inclusion criteria for running process_spikes
     inclusion = struct();
@@ -129,11 +127,11 @@ try
     hsync_rest2_ts_binned = cell2mat( hsync_rest2_ts_binned );
 
     % bin the data
-    [ Z_pre, contr_assemblies.pre_ts  ] = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', contr_assemblies.pre_ints, 'interval_mode', 'window', 'fwhm', run_dt, 'binsize', run_dt, 'inclusion', inclusion  );
+    [ Z_probe1, contr_assemblies.probe1_ts  ] = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', contr_assemblies.probe1_ints, 'interval_mode', 'window', 'fwhm', run_dt, 'binsize', run_dt, 'inclusion', inclusion  );
     Z_rest1 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest1_ts_binned, 'interval_mode', 'events' );
     [ Z_learn, contr_assemblies.learn_ts  ] = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', contr_assemblies.learn_trial_ints, 'interval_mode', 'window', 'fwhm', run_dt, 'binsize', run_dt, 'inclusion', inclusion  );
     Z_rest2 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest2_ts_binned, 'interval_mode', 'events' );
-    [ Z_post, contr_assemblies.post_ts  ] = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals',  contr_assemblies.post_ints, 'interval_mode', 'window', 'fwhm', run_dt, 'binsize', run_dt, 'inclusion', inclusion  );
+    [ Z_probe2, contr_assemblies.probe2_ts  ] = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals',  contr_assemblies.probe2_ints, 'interval_mode', 'window', 'fwhm', run_dt, 'binsize', run_dt, 'inclusion', inclusion  );
 
     % consider removing low firing rate cells
     if params.filter_low_fr
@@ -146,91 +144,28 @@ try
     details.synchronyEvents = 'ripples';
     details.err_msg{1} = err_msg;
 
-    if strcmp(reg, 'CA1') || strcmp(reg, 'all')
-        % try with CA1 PBEs
-        if isempty( fieldnames( assemblies ) )
-            disp('Trying to estimate on CA1 PBE instead')
-            load( fullfile( basepath_hpc, [basename '.CA1.HSE.events.mat'] ) )
-            hse_rest1_ts = HSE.timestamps( InIntervals( HSE.peaks, rest1_ts ), : );
-            hse_rest2_ts = HSE.timestamps( InIntervals( HSE.peaks, rest2_ts ), : );
-            hsync_rest1_ts_binned = arrayfun(@(x) hse_rest1_ts(x, 1) - ripple_dt/2 : ripple_dt : hse_rest1_ts(x, 2) + ripple_dt/2, 1:size(hse_rest1_ts, 1) , 'UniformOutput', false);
-            hsync_rest1_ts_binned = cellfun(@(x) [ x(1:end-1)' x(2:end)' ], hsync_rest1_ts_binned , 'UniformOutput', false)';
-            contr_assemblies.hsync_rest1_id = cell2mat( arrayfun(@(X) repmat(X, length( hsync_rest1_ts_binned{X} ), 1), 1:length( hsync_rest1_ts_binned ), 'UniformOutput', false)' );
-            hsync_rest1_ts_binned = cell2mat( hsync_rest1_ts_binned );
-
-            Z_rest1 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest1_ts_binned, 'interval_mode', 'events' );
-
-            hsync_rest2_ts_binned = arrayfun(@(x) hse_rest2_ts(x, 1) - ripple_dt/2 : ripple_dt : hse_rest2_ts(x, 2) + ripple_dt/2, 1:size(hse_rest2_ts, 1) , 'UniformOutput', false);
-            hsync_rest2_ts_binned = cellfun(@(x) [ x(1:end-1)' x(2:end)' ], hsync_rest2_ts_binned , 'UniformOutput', false)';
-            contr_assemblies.hsync_rest2_id = cell2mat( arrayfun(@(X) repmat(X, length( hsync_rest2_ts_binned{X} ), 1), 1:length( hsync_rest2_ts_binned ), 'UniformOutput', false)' );
-            hsync_rest2_ts_binned = cell2mat( hsync_rest2_ts_binned );
-
-            Z_rest2 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest2_ts_binned, 'interval_mode', 'events' );
-
-            if params.filter_low_fr
-                low_r_cells = any( [ sum(Z_rest1) ; sum(Z_rest2) ] < params.min_n_spk );
-                Z_rest1( :, low_r_cells ) = []; Z_rest2( :, low_r_cells ) = [];
-            end
-
-            [ assemblies, err_msg ] = run_gcpca( Z_rest2, Z_rest1, 'gcPCAversion', 4.1, 'nshuffle', nshuff );
-            details.synchronyEvents = 'CA1 PBE';
-            details.err_msg{2} = err_msg;
-        end
-    end
-    
-    % try with CA3 PBEs
-    if strcmp(reg, 'CA3') || strcmp(reg, 'all')
-        if isempty( fieldnames( assemblies ) )
-            disp('Trying to estimate on CA3 PBE instead')
-            load( fullfile( basepath_hpc, [basename '.CA3.HSE.events.mat'] ) )
-            hse_rest1_ts = HSE.timestamps( InIntervals( HSE.peaks, rest1_ts ), : );
-            hse_rest2_ts = HSE.timestamps( InIntervals( HSE.peaks, rest2_ts ), : );
-            hsync_rest1_ts_binned = arrayfun(@(x) hse_rest1_ts(x, 1) - ripple_dt/2 : ripple_dt : hse_rest1_ts(x, 2) + ripple_dt/2, 1:size(hse_rest1_ts, 1) , 'UniformOutput', false);
-            hsync_rest1_ts_binned = cellfun(@(x) [ x(1:end-1)' x(2:end)' ], hsync_rest1_ts_binned , 'UniformOutput', false)';
-            contr_assemblies.hsync_rest1_id = cell2mat( arrayfun(@(X) repmat(X, length( hsync_rest1_ts_binned{X} ), 1), 1:length( hsync_rest1_ts_binned ), 'UniformOutput', false)' );
-            hsync_rest1_ts_binned = cell2mat( hsync_rest1_ts_binned );
-
-            Z_rest1 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest1_ts_binned, 'interval_mode', 'events' );
-
-            hsync_rest2_ts_binned = arrayfun(@(x) hse_rest2_ts(x, 1) - ripple_dt/2 : ripple_dt : hse_rest2_ts(x, 2) + ripple_dt/2, 1:size(hse_rest2_ts, 1) , 'UniformOutput', false);
-            hsync_rest2_ts_binned = cellfun(@(x) [ x(1:end-1)' x(2:end)' ], hsync_rest2_ts_binned , 'UniformOutput', false)';
-            contr_assemblies.hsync_rest2_id = cell2mat( arrayfun(@(X) repmat(X, length( hsync_rest2_ts_binned{X} ), 1), 1:length( hsync_rest2_ts_binned ), 'UniformOutput', false)' );
-            hsync_rest2_ts_binned = cell2mat( hsync_rest2_ts_binned );
-
-            Z_rest2 = process_spikes( cell_metrics.spikes.times( pyrid ), 'intervals', hsync_rest2_ts_binned, 'interval_mode', 'events' );
-
-            if params.filter_low_fr
-                low_r_cells = any( [ sum(Z_rest1) ; sum(Z_rest2) ] < params.min_n_spk );
-                Z_rest1( :, low_r_cells ) = []; Z_rest2( :, low_r_cells ) = [];
-            end
-
-            [ assemblies, err_msg ]  = run_gcpca( Z_rest2, Z_rest1, 'gcPCAversion', 4.1, 'nshuffle', nshuff );
-            details.synchronyEvents = 'CA3 PBE';
-            details.err_msg{3} = err_msg;
-        end
-    end
 
     %  succeeded in obtaining gcPCs with removal of low rate cells  
     if ~isempty( fieldnames( assemblies ) ) && params.filter_low_fr
         pyrid( low_r_cells ) = [];
-        Z_pre( :, low_r_cells ) = []; Z_learn( :, low_r_cells ) = []; Z_post( :, low_r_cells ) = [];
+        Z_probe1( :, low_r_cells ) = []; Z_learn( :, low_r_cells ) = []; Z_probe2( :, low_r_cells ) = [];
     end
         
     % variance explained by each gcPC per subsession
     disp('explained variance per subsession')
     nc = size( assemblies.gcPCA.X, 2 );
-    zPre_cov = cov( zscore( Z_pre ) );
+    zProbe1_cov = cov( zscore( Z_probe1 ) );
     zLearn_cov = cov( zscore( Z_learn ) );
-    zPost_cov = cov( zscore( Z_post ) );
-    % pre
-    contr_assemblies.pcVar.d_pre_gcpca = arrayfun(@(v) assemblies.gcPCA.X(:,v)' * zPre_cov * assemblies.gcPCA.X(:,v), 1:nc );
-    [~,~, contr_assemblies.pcVar.d_pre_pca] = pca( zscore( Z_pre ) );
+    zProbe2_cov = cov( zscore( Z_probe2 ) );
+    % probe1
+    contr_assemblies.pcVar.d_probe1_gcpca = arrayfun(@(v) assemblies.gcPCA.X(:,v)' * zProbe1_cov * assemblies.gcPCA.X(:,v), 1:nc );
+    [~,~, contr_assemblies.pcVar.d_probe1_pca] = pca( zscore( Z_probe1 ) );
     % learn
     contr_assemblies.pcVar.d_learn_gcpca = arrayfun(@(v) assemblies.gcPCA.X(:,v)' * zLearn_cov * assemblies.gcPCA.X(:,v), 1:nc );
     [~,~, contr_assemblies.pcVar.d_learn_pca] = pca( zscore( Z_learn ) );
-    % post
-    contr_assemblies.pcVar.d_post_gcpca = arrayfun(@(v) assemblies.gcPCA.X(:,v)' * zPost_cov * assemblies.gcPCA.X(:,v), 1:nc );
-    [~,~, contr_assemblies.pcVar.d_post_pca] = pca( zscore( Z_post ) );
+    % probe2
+    contr_assemblies.pcVar.d_probe2_gcpca = arrayfun(@(v) assemblies.gcPCA.X(:,v)' * zProbe2_cov * assemblies.gcPCA.X(:,v), 1:nc );
+    [~,~, contr_assemblies.pcVar.d_probe2_pca] = pca( zscore( Z_probe2 ) );
 
     % store the remaining data
     contr_assemblies.assemblies = assemblies;
