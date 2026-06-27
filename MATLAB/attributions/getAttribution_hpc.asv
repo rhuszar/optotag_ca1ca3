@@ -78,8 +78,8 @@ try
 
     eAttr_old_x = [];
     vAttr_old_x = [];
-    eAttr_old_y = [];
-    vAttr_old_y = [];
+    eAttr_pre_y = [];
+    vAttr_pre_y = [];
     
     % data matrix reconstructed based on new subspace 
     train_data_new = Z_learn_rec_new( train_ids,: );
@@ -119,8 +119,8 @@ try
         vAttr_old_x = [ vAttr_old_x v(:) ];
 
         [e,v] = get_attr( gpr_rec_old_y, train_data_old, xtest_old, x0_pre );
-        eAttr_old_y = [ eAttr_old_y e(:) ];
-        vAttr_old_y = [ vAttr_old_y v(:) ];
+        eAttr_pre_y = [ eAttr_pre_y e(:) ];
+        vAttr_pre_y = [ vAttr_pre_y v(:) ];
         
         % user feedback
         if mod(dat_id, 5) == 0
@@ -132,7 +132,7 @@ try
     t = toc;
 
     save( outfile, 'eAttr_new_x', 'vAttr_new_x', 'eAttr_new_y', 'vAttr_new_y', 'eAttr_old_x',...
-                   'vAttr_old_x', 'eAttr_old_y', 'vAttr_old_y', 't', 'inpath' );
+                   'vAttr_old_x', 'eAttr_pre_y', 'vAttr_pre_y', 't', 'inpath' );
 
 catch e
     disp('Function returned due to error in loop ')

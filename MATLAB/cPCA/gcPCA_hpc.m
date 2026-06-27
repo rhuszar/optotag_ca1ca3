@@ -4,6 +4,8 @@ function gcPCA_hpc( index )
 - bin into ripples, then CA1 PBEs, then CA3 PBE...
 - run_gcpca - ensures that variance explained is balanced across conditions  
 
+note: this is meant to be run on a high performance computing cluster
+
 %}
 
 reg = 'all'; % 'CA1' or 'CA3'

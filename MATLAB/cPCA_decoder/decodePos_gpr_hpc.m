@@ -86,23 +86,24 @@ sigB_inds = flip( find( contr_assemblies.assemblies.sigB_gpc_select ) );
 dim = min( [ length(sigA_inds), length(sigB_inds) ] ); 
 if dim >= params.mindim
     
-    % preexisting / learned subspaces
-    V_learn = contr_assemblies.assemblies.gcPCA.X( :,  sigA_inds(1:dim) ) ;
-    V_preexisting = contr_assemblies.assemblies.gcPCA.X( :,  sigB_inds(1:dim)  ) ;
+    % new subspace
+    V_new = contr_assemblies.assemblies.gcPCA.X( :,  sigA_inds(1:dim) ) ;
+    % old subspace
+    V_old = contr_assemblies.assemblies.gcPCA.X( :,  sigB_inds(1:dim)  ) ;
 
 else
     
-    V_learn = contr_assemblies.assemblies.gcPCA.X( :,  1:params.mindim ) ;
-    V_preexisting = contr_assemblies.assemblies.gcPCA.X( :,  ( end-params.mindim+1 ):end  ) ;
+    V_new = contr_assemblies.assemblies.gcPCA.X( :,  1:params.mindim ) ;
+    V_old = contr_assemblies.assemblies.gcPCA.X( :,  ( end-params.mindim+1 ):end  ) ;
     dim = params.mindim;
 end
 
 % reconstructed neural activity
-Z_learn_rec_learn = ( X_z * V_learn ) * V_learn';
-Z_learn_rec_pre = ( X_z * V_preexisting ) * V_preexisting';
+Z_learn_rec_new = ( X_z * V_new ) * V_new';
+Z_learn_rec_old = ( X_z * V_old ) * V_old';
 
 rng('shuffle')
-ip = randperm( size( Z_learn_rec_learn, 1 ) );
+ip = randperm( size( Z_learn_rec_new, 1 ) );
 train_ids = sort( ip( 1:params.N ) );
 test_ids = sort( ip( params.N+1:end ) );
 
@@ -112,47 +113,47 @@ rew2_dist_test = rew2_dist( test_ids );
 
 % train a separate model for each dimension
 
-% learning subspace
-gpr_rec_learn_x = fitrgp( Z_learn_rec_learn( train_ids,: ), xpos( train_ids ) );
-gpr_rec_learn_y = fitrgp( Z_learn_rec_learn( train_ids,: ), ypos( train_ids ) );
+% new subspace
+gpr_rec_new_x = fitrgp( Z_learn_rec_new( train_ids,: ), xpos( train_ids ) );
+gpr_rec_new_y = fitrgp( Z_learn_rec_new( train_ids,: ), ypos( train_ids ) );
 
-% preexisting subspace
-gpr_rec_pre_x = fitrgp( Z_learn_rec_pre( train_ids,: ), xpos( train_ids ) );
-gpr_rec_pre_y = fitrgp( Z_learn_rec_pre( train_ids,: ), ypos( train_ids ) );
+% old subspace
+gpr_rec_old_x = fitrgp( Z_learn_rec_old( train_ids,: ), xpos( train_ids ) );
+gpr_rec_old_y = fitrgp( Z_learn_rec_old( train_ids,: ), ypos( train_ids ) );
 
 
 %% assess the model 
 
-% learning subspace
-xpred_learn_train = gpr_rec_learn_x.predict( Z_learn_rec_learn( train_ids,: ) );  % train
-ypred_learn_train = gpr_rec_learn_y.predict( Z_learn_rec_learn( train_ids,: ) );
+% new subspace
+xpred_new_train = gpr_rec_new_x.predict( Z_learn_rec_new( train_ids,: ) );  % train
+ypred_new_train = gpr_rec_new_y.predict( Z_learn_rec_new( train_ids,: ) );
 
-xpred_learn_test = gpr_rec_learn_x.predict( Z_learn_rec_learn( test_ids,: ) );    % test
-ypred_learn_test = gpr_rec_learn_y.predict( Z_learn_rec_learn( test_ids,: ) );
+xpred_new_test = gpr_rec_new_x.predict( Z_learn_rec_new( test_ids,: ) );    % test
+ypred_new_test = gpr_rec_new_y.predict( Z_learn_rec_new( test_ids,: ) );
 
-err_learn_train = vecnorm( [ xpos( train_ids )  ypos( train_ids ) ] - [xpred_learn_train ypred_learn_train], 2, 2 );
-err_learn_test = vecnorm(  [ xpos( test_ids  )  ypos( test_ids ) ] -  [xpred_learn_test  ypred_learn_test], 2, 2 );
+err_new_train = vecnorm( [ xpos( train_ids )  ypos( train_ids ) ] - [xpred_new_train ypred_new_train], 2, 2 );
+err_new_test = vecnorm(  [ xpos( test_ids  )  ypos( test_ids ) ] -  [xpred_new_test  ypred_new_test], 2, 2 );
 
-% preexisting subspace
-xpred_pre_train = gpr_rec_pre_x.predict( Z_learn_rec_pre( train_ids,: ) );        % train
-ypred_pre_train = gpr_rec_pre_y.predict( Z_learn_rec_pre( train_ids,: ) );
+% old subspace
+xpred_old_train = gpr_rec_old_x.predict( Z_learn_rec_old( train_ids,: ) );        % train
+ypred_old_train = gpr_rec_old_y.predict( Z_learn_rec_old( train_ids,: ) );
 
-xpred_pre_test = gpr_rec_pre_x.predict( Z_learn_rec_pre( test_ids,: ) );     % test
-ypred_pre_test = gpr_rec_pre_y.predict( Z_learn_rec_pre( test_ids,: ) );
+xpred_old_test = gpr_rec_old_x.predict( Z_learn_rec_old( test_ids,: ) );     % test
+ypred_old_test = gpr_rec_old_y.predict( Z_learn_rec_old( test_ids,: ) );
 
-err_pre_train = vecnorm( [ xpos( train_ids )  ypos( train_ids ) ] -  [ xpred_pre_train ypred_pre_train ], 2, 2 );
-err_pre_test = vecnorm( [ xpos( test_ids )  ypos( test_ids ) ] - [ xpred_pre_test  ypred_pre_test  ], 2, 2 );
+err_old_train = vecnorm( [ xpos( train_ids )  ypos( train_ids ) ] -  [ xpred_old_train ypred_old_train ], 2, 2 );
+err_old_test = vecnorm( [ xpos( test_ids )  ypos( test_ids ) ] - [ xpred_old_test  ypred_old_test  ], 2, 2 );
 
 % error as a function of trial
 [~, trial_id] = InIntervals( ts( test_ids ), contr_assemblies.learn_trial_ints );
 ntrials = length( contr_assemblies.learn_trial_ints  );
 
-err_pre_test_trial = [ arrayfun(@(x) mean( err_pre_test( trial_id == x ) ), 1:ntrials )' arrayfun(@(x) sem( err_pre_test( trial_id == x ) ), 1:ntrials )' ] ;
-err_learn_test_trial =  [ arrayfun(@(x) mean( err_learn_test( trial_id == x ) ), 1:ntrials )' arrayfun(@(x) sem( err_learn_test( trial_id == x ) ), 1:ntrials )' ];
+err_old_test_trial = [ arrayfun(@(x) mean( err_old_test( trial_id == x ) ), 1:ntrials )' arrayfun(@(x) sem( err_old_test( trial_id == x ) ), 1:ntrials )' ] ;
+err_new_test_trial =  [ arrayfun(@(x) mean( err_new_test( trial_id == x ) ), 1:ntrials )' arrayfun(@(x) sem( err_new_test( trial_id == x ) ), 1:ntrials )' ];
 
-save( outfile,'pyrid', 'train_ids', 'test_ids', 'Z_learn_rec_learn', 'Z_learn_rec_pre', 'gpr_rec_learn_x', 'gpr_rec_learn_y', ...
-    'gpr_rec_pre_x', 'gpr_rec_pre_y','err_pre_train', 'err_pre_test', 'err_learn_train', 'err_learn_test', 'ts', 'trial_id', ...
-    'err_pre_test_trial', 'err_learn_test_trial', 'dim','infolder','params', '-v7.3')
+save( outfile,'pyrid', 'train_ids', 'test_ids', 'Z_learn_rec_new', 'Z_learn_rec_old', 'gpr_rec_new_x', 'gpr_rec_new_y', ...
+    'gpr_rec_old_x', 'gpr_rec_old_y','err_old_train', 'err_old_test', 'err_new_train', 'err_new_test', 'ts', 'trial_id', ...
+    'err_old_test_trial', 'err_new_test_trial', 'dim','infolder','params', '-v7.3')
 
 
 catch e

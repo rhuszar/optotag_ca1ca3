@@ -18,22 +18,22 @@ for bp = 1:length( basepaths_all )
     fils = dir( attr_path_full );
     fils = { fils.name };
     fils(1:2) = [];
-    eAttr_learn_x_all = []; eAttr_pre_x_all = [];
-    eAttr_learn_y_all = []; eAttr_pre_y_all = [];
+    eAttr_new_x_all = []; eAttr_old_x_all = [];
+    eAttr_new_y_all = []; eAttr_old_y_all = [];
     % combine all the batched attribution outputs to produce a single time series
     for k = 1:length( fils )
         load( fullfile( attr_path_full, sprintf('_%d.mat', k) ) )
-        eAttr_learn_x_all = add_to_mat( eAttr_learn_x_all, eAttr_learn_x' );
-        eAttr_learn_y_all = add_to_mat( eAttr_learn_y_all, eAttr_learn_y' );
-        eAttr_pre_x_all = add_to_mat( eAttr_pre_x_all, eAttr_pre_x' );
-        eAttr_pre_y_all = add_to_mat( eAttr_pre_y_all, eAttr_pre_y' );
+        eAttr_new_x_all = add_to_mat( eAttr_new_x_all, eAttr_new_x' );
+        eAttr_new_y_all = add_to_mat( eAttr_new_y_all, eAttr_new_y' );
+        eAttr_old_x_all = add_to_mat( eAttr_old_x_all, eAttr_old_x' );
+        eAttr_old_y_all = add_to_mat( eAttr_old_y_all, eAttr_old_y' );
     end
-    A_learn = abs( eAttr_learn_x_all + eAttr_learn_y_all ); 
-    A_base = abs( eAttr_pre_x_all + eAttr_pre_y_all );
+    A_new = abs( eAttr_new_x_all + eAttr_new_y_all ); 
+    A_old = abs( eAttr_old_x_all + eAttr_old_y_all );
     ts_test = v.ts(v.test_ids);
     id_test = v.test_ids;
     
     % save datas
-    save( fullfile( basepath, outfile ), 'A_learn', 'A_base', 'ts_test', 'gpr_path', 'attr_path', 'id_test', 'description', '-v7.3')
+    save( fullfile( basepath, outfile ), 'A_new', 'A_old', 'ts_test', 'gpr_path', 'attr_path', 'id_test', 'description', '-v7.3')
 
 end
